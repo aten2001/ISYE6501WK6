@@ -1,0 +1,45 @@
+---
+title: "ISYE6501 HW6"
+author: "Keh-Harng Feng"
+date: "June 23, 2017"
+header-includes:
+    - \usepackage{placeins}
+output: 
+  bookdown::html_document2:
+    fig_caption: TRUE
+    toc: FALSE
+urlcolor: blue
+---
+```{r setup, include=FALSE}
+library('knitr')
+
+opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
+options(digits = 4)
+```
+
+## Preface
+This is a reproducible report with most of the codes doing the heavy lifting hidden in the background. You can download the source code of the report by [clicking here](). All of the information you need as a reviewer is in the report, not in the code. You should NEVER run any R scripts from an untrusted source on your own computer.  
+
+# Question 1
+**In this problem you, can simulate a simplified airport security system at a busy airport. Passengers arrive according to a Poisson distribution with λ1 = 5 per minute (i.e., mean interarrival rate μ1 = 0.2 minutes) to the ID/boarding-pass check queue, where there are several servers who each have exponential service time with mean rate μ2 = 0.75 minutes. [Hint: model them as one block that has more than one resource.] After that, the passengers are assigned to the shortest of the several personal-check queues, where they go through the personal scanner (time is uniformly distributed between 0.5 minutes and 1 minute).**
+
+**Use the Arena software to build a simulation of the system, and then vary the number of ID/boarding-pass checkers and personal-check queues to determine how many are needed to keep average wait times below 15 minutes.**
+
+# Question 2
+**The breast cancer data set at http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/ (description at http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Original%29 ) has missing values.**
+**1. Use the mean/mode imputation method to impute values for the missing data.**
+**2. Use regression to impute values for the missing data.**
+**3. Use regression with perturbation to impute values for the missing data.**
+**4. (Optional) Compare the results and quality of classification models (e.g., SVM, KNN) build using (1) the data sets from questions 1,2,3; (2) the data that remains after data points with missing values are removed; and (3) the data set when a binary variable is introduced to indicate missing values.**
+
+The data is imported using `read.csv()` without headers. All variables are assumed to be categorical since besides the obvious (numerical ID and class) they all exhibit the curious phenomenon of having only integer values between 1 and 10. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. 
+
+The original description of the data set does not mention why the data is missing.
+
+The data set is split into a training and validation set (80/20). From this point on all operations are carried out on the training set unless otherwise specified.
+
+## Data Imputation
+Since all factors are categorical a simple imputation method is devised to impute the data by mode (the code to determine the mode can be found [here](https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode))
+
+# Question 3
+**Describe a situation or problem from your job, everyday life, current events, etc., for which optimization would be appropriate. What data would you need?**
