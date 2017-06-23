@@ -73,12 +73,16 @@ impute_perturb <- function(data) {
     
     model <- cv.glmnet(V7 ~., data = data.train, family = 'gaussian')
     
+    sd = sqrt(min(model$cvm))
+    
     pred <- predict(model, newdata = data.tbi, type = 'response', s = 'lambda.min')
     
     noise <- rnorm(n = length(pred), mean = 0, 
-                   sd = sd(as.numeric(as.character(data.train[,7]))))
+                   sd = sd)
     
-    pred <- min(max(1, floor(pred + noise + 0.5)), 10)
+    tempfunc <- function(x) {return(min(max(1, x), 10))}
+    
+    pred <- sapply(floor(pred + noise + 0.5), FUN = tempfunc)
     
     data.imp <- data
     data.imp[ind,7] <- pred
@@ -91,3 +95,9 @@ set.seed(123)
 q2.train.imp.mode <- impute_mode(q2_data.train)
 q2.train.imp.reg <- impute_reg(q2_data.train)
 q2.train.imp.pert <- impute_perturb(q2_data.train)
+
+## Final part
+missing <- is.na(q2.train[,7])
+q2.train.complete <- q2.train[missing,]
+
+# Build models & compare.
