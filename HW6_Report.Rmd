@@ -32,7 +32,7 @@ This is a reproducible report with most of the codes doing the heavy lifting hid
 **3. Use regression with perturbation to impute values for the missing data.**
 **4. (Optional) Compare the results and quality of classification models (e.g., SVM, KNN) build using (1) the data sets from questions 1,2,3; (2) the data that remains after data points with missing values are removed; and (3) the data set when a binary variable is introduced to indicate missing values.**
 
-The data is imported using `read.csv()` without headers. All variables are assumed to be categorical since besides the obvious (numerical ID and class) they all exhibit the curious phenomenon of having only integer values between 1 and 10. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. 
+The data is imported using `read.csv()` without headers. Besides the obvious (numerical ID and class) all variables are assumed to be categorical since  they all exhibit the curious phenomenon of having only integer values between 1 and 10. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. 
 
 The original description of the data set does not mention why the data is missing.
 
