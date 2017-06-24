@@ -1,5 +1,8 @@
 library('glmnet')
 library('glmnetUtils')
+library('caret')
+library('parallel')
+library('doParallel')
 
 q2_data <- read.csv('breast-cancer-wisconsin.data', header = FALSE, na.strings = '?')
 
@@ -51,7 +54,8 @@ impute_reg <- function(data) {
     data.tbi <- data[ind, ]
     data.train <- data[!ind, ]
     
-    model <- cv.glmnet(V7 ~., data = data.train, family = 'gaussian')
+    model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
+                       data = data.train, family = 'gaussian')
     
     pred <- predict(model, newdata = data.tbi, type = 'response', s = 'lambda.min')
     
@@ -71,7 +75,8 @@ impute_perturb <- function(data) {
     data.tbi <- data[ind, ]
     data.train <- data[!ind, ]
     
-    model <- cv.glmnet(V7 ~., data = data.train, family = 'gaussian')
+    model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
+                       data = data.train, family = 'gaussian')
     
     sd = sqrt(min(model$cvm))
     
@@ -97,7 +102,17 @@ q2.train.imp.reg <- impute_reg(q2_data.train)
 q2.train.imp.pert <- impute_perturb(q2_data.train)
 
 ## Final part
-missing <- is.na(q2.train[,7])
-q2.train.complete <- q2.train[missing,]
+missing <- is.na(q2_data.train[,7])
+q2.train.complete <- q2_data.train[!missing,]
 
 # Build models & compare.
+trCon <- trainControl(method = 'cv')
+
+set.seed(123)
+
+cl <- makeCluster(detectCores(logical = FALSE))
+registerDoParallel(cl)
+# 
+# model.mode <- train(V11 ~., data = q2.train.imp.mode, method = 'rf', trControl = trCon)
+# model.reg <- train(V11 ~., data = q2.train.imp.reg, method = 'rf', trControl = trCOn)
+# model.pert <- train()
