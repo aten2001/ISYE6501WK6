@@ -5,7 +5,7 @@ date: "June 23, 2017"
 header-includes:
     - \usepackage{placeins}
 output: 
-  bookdown::html_document2:
+  bookdown::pdf_book:
     fig_caption: TRUE
     toc: FALSE
 urlcolor: blue
@@ -15,18 +15,31 @@ library('knitr')
 library('glmnet')
 library('glmnetUtils')
 library('caret')
+library('rpart.plot')
+library('png')
+library('grid')
 
 opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
 options(digits = 4)
 ```
 
 ## Preface
-This is a reproducible report with most of the codes doing the heavy lifting hidden in the background. You can download the source code of the report by [clicking here](). All of the information you need as a reviewer is in the report, not in the code. You should NEVER run any R scripts from an untrusted source on your own computer.  
+This is a reproducible report with most of the codes doing the heavy lifting hidden in the background. You can download the source code of the report by [clicking here](https://github.com/fengkehh/ISYE6501WK6/blob/master/HW6_Report.Rmd). All of the information you need as a reviewer is in the report, not in the code. You should NEVER run any R scripts from an untrusted source on your own computer.  
 
 # Question 1
-**In this problem you, can simulate a simplified airport security system at a busy airport. Passengers arrive according to a Poisson distribution with λ1 = 5 per minute (i.e., mean interarrival rate μ1 = 0.2 minutes) to the ID/boarding-pass check queue, where there are several servers who each have exponential service time with mean rate μ2 = 0.75 minutes. [Hint: model them as one block that has more than one resource.] After that, the passengers are assigned to the shortest of the several personal-check queues, where they go through the personal scanner (time is uniformly distributed between 0.5 minutes and 1 minute).**
+**In this problem you, can simulate a simplified airport security system at a busy airport. Passengers arrive according to a Poisson distribution with $\lambda1$ = 5 per minute (i.e., mean interarrival rate $\mu1$ = 0.2 minutes) to the ID/boarding-pass check queue, where there are several servers who each have exponential service time with mean rate $\mu2$ = 0.75 minutes. [Hint: model them as one block that has more than one resource.] After that, the passengers are assigned to the shortest of the several personal-check queues, where they go through the personal scanner (time is uniformly distributed between 0.5 minutes and 1 minute).**
 
 **Use the Arena software to build a simulation of the system, and then vary the number of ID/boarding-pass checkers and personal-check queues to determine how many are needed to keep average wait times below 15 minutes.**
+
+A screenshot of the Arena model is shown below. The model can be downloaded [here](https://github.com/fengkehh/ISYE6501WK6/blob/master/Model_Q1.doe).
+```{r, out.width = '500pt'}
+# img <- readPNG("./model_ss.png")
+# grid.raster(img)
+
+include_graphics('./model_ss.png')
+```
+
+An one-hour simulation is run. The generated report can be downloaded [here](https://github.com/fengkehh/ISYE6501WK6/blob/master/Model_Out.pdf). The average total time for each passenger is about 8.28 minutes with 4 workers at the ID checkpoint (in a resource set) and 3 scanner stations, each with its own queue.
 
 # Question 2
 **The breast cancer data set at http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/ (description at http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Original%29 ) has missing values.**
@@ -52,7 +65,7 @@ q2_data.train <- q2_data[inTrain,]
 q2_data.validation <- q2_data[-inTrain,]
 ```
 
-The data is imported using `read.csv()` without headers. The string "?" is set as <NA>. Column 1 and 11 (numerical ID and class) are converted to factors since they are categorical. Notice that the data contains `r sum(q2_data$V11 == '2')` measurements with response '2' and `r sum(q2_data$V11 == '4')` measurements with response '4'. This means the data is not well balanced and *balanced accuracy* should be used as the performance metric later on. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. The original description of the data set does not mention why the data is missing. They will be assumed to be Missing Completely At Random (MCAR) in this analysis.
+The data is imported using `read.csv()` without headers. The string "?" is set as **NA**. Column 1 and 11 (numerical ID and class) are converted to factors since they are categorical. Notice that the data contains `r sum(q2_data$V11 == '2')` measurements with response '2' and `r sum(q2_data$V11 == '4')` measurements with response '4'. This means the data is not well balanced and *balanced accuracy* should be used as the performance metric later on. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. The original description of the data set does not mention why the data is missing. They are assumed to be Missing Completely At Random (MCAR) in this analysis.
 
 The data set is split into a training and validation set (80/20). From this point on all operations are carried out on the training set unless otherwise specified.
 
@@ -171,15 +184,15 @@ Missing data in the training set are dealt with using five different methods.
 
 1. Imputation by mode (the code to determine the mode is from [here](https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode)).
 
-2. Imputation by LASSO regression (prediction is converted to natural numbers between 1 to 10 with rounding (carries from 5 and up)). Predictors used are everything besides V7 (the imputation target) and V11 (response).
+2. Imputation by LASSO regression (prediction is converted to natural numbers between 1 to 10 with rounding (carries from 5 and up)). Predictors used are everything besides `V7` (the imputation target) and `V11` (response).
 
-3. Imputation by LASSO regression with perturbations. Predictors used are everything besides V7 (the imputation target) and V11 (response). Perturbations are generated as a normally distributed noise term where the standard deviation is set to the minimized LASSO model RMSE. Values are then rounded as in point 2.
+3. Imputation by LASSO regression with perturbations. Predictors used are everything besides `V7` (the imputation target) and `V11` (response). Perturbations are generated as a normally distributed noise term where the standard deviation is set to the minimized LASSO model RMSE. Values are then rounded as in point 2.
 
-4. Column 7 is converted to a categorical predictor with a new level `0` to indicate whether the corresponding point in V7 is missing.
+4. Column 7 is converted to a categorical predictor with a new level `0` to indicate whether the corresponding point in `V7` is missing.
 
 5. All datapoints with missing values are discarded. 
 
-These datasets are then used to construct five classification trees (no tuning).
+These datasets are then used to construct five classification trees (no tuning). The structures of the trees can be found in the [Appendix](#AppPlot)
 
 ## Model Performance
 ```{r}
@@ -219,34 +232,92 @@ pred.pert <- predict(model.pert, newdata = q2.validation.pert)
 pred.addition <- predict(model.addition, newdata = q2.validation.addition)
 pred.complete <- predict(model.complete, newdata = q2.validation.complete)
 ```
-Five sets of predictions are made using the five models on the validation set. The validation set is first imputed using the corresponding imputation methods (predictions using trained imputation models from the training set if applicable, otherwise same imputation methodology such as in cases 4 and 5) before being fed to the prediction models. The resulting confusion matrices are shown below.
+Five sets of predictions are made using the five models on the validation set. The validation set is first imputed using the corresponding imputation methods (predictions using trained imputation models from the training set if applicable, otherwise same imputation methodology such as in cases 4 and 5) before being fed to the prediction models. The resulting confusion matrices can be found in the [Appendix](#AppMat). As mentioned before, since the data is not well balanced between the two response levels, balanced accuracy will be used as the main indicator for the model performance. This is shown in the table below.
 
-1. Imputation by mode:
 ```{r, cached = FALSE}
-confusionMatrix(q2.validation.mode$V11, pred.mode)
+mat.mode <- confusionMatrix(q2.validation.mode$V11, pred.mode)
+mat.reg <- confusionMatrix(q2.validation.reg$V11, pred.reg)
+mat.pert <- confusionMatrix(q2.validation.pert$V11, pred.pert)
+mat.addition <- confusionMatrix(q2.validation.addition$V11, pred.addition)
+mat.complete <- confusionMatrix(q2.validation.complete$V11, pred.complete)
+
+df <- data.frame(Type = c('Mode', 'Regression', 'Perturbation', 'Level Addition', 'Discard'), Balanced.Accuracy = c(mat.mode$byClass[11], mat.reg$byClass[11], mat.pert$byClass[11], mat.addition$byClass[11], mat.complete$byClass[11]))
+
+kable(df)
 ```
 
-2. Imputation by LASSO regression:
-```{r, cached = FALSE}
-confusionMatrix(q2.validation.reg$V11, pred.reg)
-```
-
-3. Imputation by LASSO regression with perturbation:
-```{r, cached = FALSE}
-confusionMatrix(q2.validation.pert$V11, pred.pert)
-```
-
-4. Imputation by adding categorical level:
-```{r, cached = FALSE}
-confusionMatrix(q2.validation.addition$V11, pred.addition)
-```
-
-5. Imputation by discarding missing data:
-```{r, cached = FALSE}
-confusionMatrix(q2.validation.complete$V11, pred.complete)
-```
-
-As mentioned before, since the data is not well balanced between the two response levels, balanced accuracy will be used as the main indicator for the model performance. It seems that imputation by LASSO regression results in overall best model, followed by discarding missing data, imputation by mode, and finally a tie between perturbation and adding categorical level.
+It seems that imputation by LASSO regression results in the overall best model, followed by discarding missing data, imputation by mode, and finally a tie between perturbation and adding categorical level. However the difference is quite small (< 1%).
 
 # Question 3
 **Describe a situation or problem from your job, everyday life, current events, etc., for which optimization would be appropriate. What data would you need?**
+
+Question 1 of this assignment can be construed as an optimization problem, where the objective function is to minimize the total cost to set up and maintain an airport over a fixed period. The data required in question would be 
+
+1. Cost of a single worker (salary, benefits etc) for a period.
+2. Cost of a single scanner machine (initial cost, maintenance cost) for a period.
+
+The variables are:
+
+1. Number of workers.
+2. Number of scanner machines.
+
+The constraint is that the average total time a passenger spends going through the airport must be kept under a threshold (for example, 15 minutes). Ideally a mathematical equation describing the relationship between average total time for a passenger and the variables should be written to allow the use of calculus to solve the optimization problem. However, if said equation cannot be deduced easily the problem can still be solved with the use of a simulation software in conjunction with grid search.
+
+# Appendix
+
+## Tree Plots {#AppPlot}
+1. Imputation by mode:
+\FloatBarrier
+```{r}
+rpart.plot(model.mode$finalModel)
+```
+
+2. Imputation by LASSO regression:
+\FloatBarrier
+```{r}
+rpart.plot(model.reg$finalModel)
+```
+
+3. Imputation by LASSO regression with perturbation:
+\FloatBarrier
+```{r}
+rpart.plot(model.pert$finalModel)
+```
+
+4. Imputation by adding categorical level:
+\FloatBarrier
+```{r}
+rpart.plot(model.addition$finalModel)
+```
+
+5. Imputation by discarding missing data:
+\FloatBarrier
+```{r}
+rpart.plot(model.complete$finalModel)
+```
+
+## Confusion Matrices of Prediction Results {#AppMat}
+1. Imputation by mode:
+```{r}
+mat.mode
+```
+
+2. Imputation by LASSO regression:
+```{r}
+mat.reg
+```
+
+3. Imputation by LASSO regression with perturbation:
+```{r}
+mat.pert
+```
+
+4. Imputation by adding categorical level:
+```{r}
+mat.addition
+```
+
+5. Imputation by discarding missing data:
+```{r}
+mat.complete
+```
