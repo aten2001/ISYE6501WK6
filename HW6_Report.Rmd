@@ -12,6 +12,9 @@ urlcolor: blue
 ---
 ```{r setup, include=FALSE}
 library('knitr')
+library('glmnet')
+library('glmnetUtils')
+library('caret')
 
 opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
 options(digits = 4)
@@ -32,14 +35,218 @@ This is a reproducible report with most of the codes doing the heavy lifting hid
 **3. Use regression with perturbation to impute values for the missing data.**
 **4. (Optional) Compare the results and quality of classification models (e.g., SVM, KNN) build using (1) the data sets from questions 1,2,3; (2) the data that remains after data points with missing values are removed; and (3) the data set when a binary variable is introduced to indicate missing values.**
 
-The data is imported using `read.csv()` without headers. Besides the obvious (numerical ID and class) all variables are assumed to be categorical since  they all exhibit the curious phenomenon of having only integer values between 1 and 10. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. 
+```{r}
+q2_data <- read.csv('breast-cancer-wisconsin.data', header = FALSE, na.strings = '?')
 
-The original description of the data set does not mention why the data is missing.
+q2_data$V11 <- factor(q2_data$V11)
+q2_data$V1 <- factor(q2_data$V1)
+
+# for (i in 1:ncol(q2_data)) {
+#     q2_data[,i] <- factor(q2_data[,i])
+# }
+
+# validation/training split (20/80)
+set.seed(123)
+inTrain <- sample(1:nrow(q2_data), size = ceiling(nrow(q2_data)*0.8))
+q2_data.train <- q2_data[inTrain,]
+q2_data.validation <- q2_data[-inTrain,]
+```
+
+The data is imported using `read.csv()` without headers. The string "?" is set as <NA>. Column 1 and 11 (numerical ID and class) are converted to factors since they are categorical. Notice that the data contains `r sum(q2_data$V11 == '2')` measurements with response '2' and `r sum(q2_data$V11 == '4')` measurements with response '4'. This means the data is not well balanced and *balanced accuracy* should be used as the performance metric later on. Column 7 contains 16 missing data points which amounts to about 2.3% of the total measured. The original description of the data set does not mention why the data is missing. They will be assumed to be Missing Completely At Random (MCAR) in this analysis.
 
 The data set is split into a training and validation set (80/20). From this point on all operations are carried out on the training set unless otherwise specified.
 
 ## Data Imputation
-Since all factors are categorical a simple imputation method is devised to impute the data by mode (the code to determine the mode can be found [here](https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode))
+```{r}
+Mode <- function(x) {
+    ux <- unique(x)
+    ux[which.max(tabulate(match(x, ux)))]
+}
+
+
+train_impute_mode <- function(data) {
+    mode <- Mode(data[,7])
+    
+    return(mode)
+}
+
+predict_impute_mode <- function(model, newdata) {
+    ind.missing <- is.na(newdata[,7])
+    
+    newdata[ind.missing,7] <- model
+    
+    return(newdata)
+}
+
+train_impute_reg <- function(data) {
+    # Impute using LASSO regression
+    ind <- is.na(data[,7])
+
+    data.train <- data[!ind, ]
+    
+    model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
+                       data = data.train, family = 'gaussian')
+    
+    return(model)
+}
+
+predict_impute_reg <- function(model, newdata) {
+    ind <- is.na(newdata[,7])
+    
+    data.tbi <- newdata[ind,]
+    
+    pred <- predict(model, newdata = data.tbi, type = 'response', s = 'lambda.min')
+    
+    pred <- floor(0.5 + pred)
+    
+    data.imp <- newdata
+    data.imp[ind,7] <- pred
+    #data.imp[,7] <- factor(data.imp[,7])
+    
+    return(data.imp)
+}
+
+train_impute_perturb <- function(data) {
+    # Impute using LASSO regression
+    ind <- is.na(data[,7])
+
+    data.train <- data[!ind, ]
+    
+    model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
+                       data = data.train, family = 'gaussian')
+    
+    return(model)
+}
+
+predict_impute_perturb <- function(model, newdata) {
+    # Impute with model prediction +  normally distributed noise. 
+    # SD = model RMSE.
+    ind <- is.na(newdata[,7])
+    
+    data.tbi <- newdata[ind, ]
+    
+    sd = sqrt(min(model$cvm))
+    
+    pred <- predict(model, newdata = data.tbi, type = 'response', s = 'lambda.min')
+    
+    noise <- rnorm(n = length(pred), mean = 0, 
+                   sd = sd)
+    
+    pred <- pmin(pmax(1, floor(pred + noise + 0.5)), 10)
+    
+    data.imp <- newdata
+    data.imp[ind,7] <- pred
+    #data.imp[,7] <- factor(data.imp[,7])
+    
+    return(data.imp)
+}
+
+add_level <- function(data) {
+    ind <- is.na(data[,7])
+    
+    values <- as.numeric(as.character(data[,7]))
+    
+    values[ind] = 0
+    
+    data[,7] <- factor(values)
+    
+    return(data)
+}
+
+imp.model.mode <- train_impute_mode(q2_data.train)
+imp.model.reg <- train_impute_reg(q2_data.train)
+imp.model.perturb <- train_impute_perturb(q2_data.train)
+
+q2.train.imp.mode <- predict_impute_mode(imp.model.mode, q2_data.train)
+q2.train.imp.reg <- predict_impute_reg(imp.model.reg, q2_data.train)
+set.seed(123)
+q2.train.imp.pert <- predict_impute_perturb(imp.model.perturb, q2_data.train)
+
+q2.train.complete <- q2_data.train[!is.na(q2_data.train[,7]),]
+
+q2.train.addition <- add_level(q2_data.train)
+```
+
+Missing data in the training set are dealt with using five different methods.
+
+1. Imputation by mode (the code to determine the mode is from [here](https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode)).
+
+2. Imputation by LASSO regression (prediction is converted to natural numbers between 1 to 10 with rounding (carries from 5 and up)). Predictors used are everything besides V7 (the imputation target) and V11 (response).
+
+3. Imputation by LASSO regression with perturbations. Predictors used are everything besides V7 (the imputation target) and V11 (response). Perturbations are generated as a normally distributed noise term where the standard deviation is set to the minimized LASSO model RMSE. Values are then rounded as in point 2.
+
+4. Column 7 is converted to a categorical predictor with a new level `0` to indicate whether the corresponding point in V7 is missing.
+
+5. All datapoints with missing values are discarded. 
+
+These datasets are then used to construct five classification trees (no tuning).
+
+## Model Performance
+```{r}
+trCon <- trainControl(method = 'none')
+# tune <- data.frame(mtry = sqrt(10))
+tune <- data.frame(cp = 0.01)
+
+set.seed(123)
+# model.mode <- train(V11 ~., data = q2.train.imp.mode, method = 'rf', trControl = trCon, tuneGrid = tune, ntree = 1001)
+model.mode <- train(V11 ~., data = q2.train.imp.mode, method = 'rpart', trControl = trCon, tuneGrid = tune)
+
+set.seed(123)
+model.reg <- train(V11 ~., data = q2.train.imp.reg, method = 'rpart', trControl = trCon, tuneGrid = tune)
+
+set.seed(123)
+model.pert <- train(V11 ~., data = q2.train.imp.pert, method = 'rpart', trControl = trCon, tuneGrid = tune)
+
+set.seed(123)
+model.complete <- train(V11 ~., data = q2.train.complete, method = 'rpart', trControl = trCon, tuneGrid = tune)
+
+set.seed(123)
+model.addition <- train(V11 ~., data = q2.train.addition, method = 'rpart', trControl = trCon, tuneGrid = tune)
+```
+
+```{r, cached = FALSE}
+q2.validation.mode <- predict_impute_mode(imp.model.mode, newdata = q2_data.validation)
+q2.validation.reg <- predict_impute_reg(imp.model.reg, newdata = q2_data.validation)
+q2.validation.pert <- predict_impute_perturb(imp.model.perturb, newdata = q2_data.validation)
+q2.validation.addition <- add_level(q2_data.validation)
+q2.validation.complete <- q2_data.validation[!is.na(q2_data.validation[,7]),]
+
+
+
+pred.mode <- predict(model.mode, newdata = q2.validation.mode)
+pred.reg <- predict(model.reg, newdata = q2.validation.reg)
+pred.pert <- predict(model.pert, newdata = q2.validation.pert)
+pred.addition <- predict(model.addition, newdata = q2.validation.addition)
+pred.complete <- predict(model.complete, newdata = q2.validation.complete)
+```
+Five sets of predictions are made using the five models on the validation set. The validation set is first imputed using the corresponding imputation methods (predictions using trained imputation models from the training set if applicable, otherwise same imputation methodology such as in cases 4 and 5) before being fed to the prediction models. The resulting confusion matrices are shown below.
+
+1. Imputation by mode:
+```{r, cached = FALSE}
+confusionMatrix(q2.validation.mode$V11, pred.mode)
+```
+
+2. Imputation by LASSO regression:
+```{r, cached = FALSE}
+confusionMatrix(q2.validation.reg$V11, pred.reg)
+```
+
+3. Imputation by LASSO regression with perturbation:
+```{r, cached = FALSE}
+confusionMatrix(q2.validation.pert$V11, pred.pert)
+```
+
+4. Imputation by adding categorical level:
+```{r, cached = FALSE}
+confusionMatrix(q2.validation.addition$V11, pred.addition)
+```
+
+5. Imputation by discarding missing data:
+```{r, cached = FALSE}
+confusionMatrix(q2.validation.complete$V11, pred.complete)
+```
+
+As mentioned before, since the data is not well balanced between the two response levels, balanced accuracy will be used as the main indicator for the model performance. It seems that imputation by LASSO regression results in overall best model, followed by discarding missing data, imputation by mode, and finally a tie between perturbation and adding categorical level.
 
 # Question 3
 **Describe a situation or problem from your job, everyday life, current events, etc., for which optimization would be appropriate. What data would you need?**

@@ -6,9 +6,9 @@ library('doParallel')
 
 q2_data <- read.csv('breast-cancer-wisconsin.data', header = FALSE, na.strings = '?')
 
-# for (i in 1:ncol(q2_data)) {
-#     q2_data[,i] <- factor(q2_data[,i])
-# }
+for (i in 1:ncol(q2_data)) {
+    q2_data[,i] <- factor(q2_data[,i])
+}
 
 # validation/training split (20/80)
 set.seed(123)
@@ -34,49 +34,68 @@ Mode <- function(x) {
     ux[which.max(tabulate(match(x, ux)))]
 }
 
-impute_mode <- function(data) {
-    # Impute using mode (col 7 is categorical)
-    ind.missing <- is.na(data[,7])
 
+train_impute_mode <- function(data) {
     mode <- Mode(data[,7])
-
-    data.imp <- data
-    data.imp[ind.missing,7] <- mode
     
-    return(data.imp)
-
+    return(mode)
 }
 
-impute_reg <- function(data) {
+predict_impute_mode <- function(model, newdata) {
+    ind.missing <- is.na(newdata[,7])
+    
+    newdata[ind.missing,7] <- model
+    
+    return(newdata)
+}
+
+train_impute_reg <- function(data) {
     # Impute using LASSO regression
     ind <- is.na(data[,7])
-    
-    data.tbi <- data[ind, ]
+
     data.train <- data[!ind, ]
     
     model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
                        data = data.train, family = 'gaussian')
     
+    return(model)
+}
+
+predict_impute_reg <- function(model, newdata) {
+    ind <- is.na(newdata[,7])
+    
+    data.tbi <- newdata[ind,]
+    
     pred <- predict(model, newdata = data.tbi, type = 'response', s = 'lambda.min')
     
     pred <- floor(0.5 + pred)
     
-    data.imp <- data
+    data.imp <- newdata
     data.imp[ind,7] <- pred
     data.imp[,7] <- factor(data.imp[,7])
     
     return(data.imp)
 }
 
-impute_perturb <- function(data) {
+
+train_impute_perturb <- function(data) {
     # Impute using LASSO regression
     ind <- is.na(data[,7])
-    
-    data.tbi <- data[ind, ]
+
     data.train <- data[!ind, ]
     
     model <- cv.glmnet(V7 ~ V1 + V2 + V3 + V4 + V5 + V6 + V8 + V9 + V10, 
                        data = data.train, family = 'gaussian')
+    
+    return(model)
+}
+
+predict_impute_perturb <- function(model, newdata) {
+    # Impute with model prediction +  normally distributed noise. 
+    # SD = model RMSE.
+    ind <- is.na(newdata[,7])
+    
+    data.tbi <- newdata[ind, ]
     
     sd = sqrt(min(model$cvm))
     
@@ -85,21 +104,24 @@ impute_perturb <- function(data) {
     noise <- rnorm(n = length(pred), mean = 0, 
                    sd = sd)
     
-    tempfunc <- function(x) {return(min(max(1, x), 10))}
+    pred <- pmin(pmax(1, floor(pred + noise + 0.5)), 10)
     
-    pred <- sapply(floor(pred + noise + 0.5), FUN = tempfunc)
-    
-    data.imp <- data
+    data.imp <- newdata
     data.imp[ind,7] <- pred
     data.imp[,7] <- factor(data.imp[,7])
     
     return(data.imp)
 }
 
+
+imp.model.mode <- train_impute_mode(q2_data.train)
+imp.model.reg <- train_impute_reg(q2_data.train)
+imp.model.perturb <- train_impute_perturb(q2_data.train)
+
+q2.train.imp.mode <- predict_impute_mode(imp.model.mode, q2_data.train)
+q2.train.imp.reg <- predict_impute_reg(imp.model.reg, q2_data.train)
 set.seed(123)
-q2.train.imp.mode <- impute_mode(q2_data.train)
-q2.train.imp.reg <- impute_reg(q2_data.train)
-q2.train.imp.pert <- impute_perturb(q2_data.train)
+q2.train.imp.pert <- predict_impute_perturb(imp.model.perturb, q2_data.train)
 
 ## Final part
 missing <- is.na(q2_data.train[,7])
